@@ -1,0 +1,121 @@
+using System;
+using System.ComponentModel;
+using System.Windows.Forms;
+
+namespace ToggleButton
+{
+    public class ToggleButton : Button
+    {
+        public enum ToggleStates : uint
+        {
+            On = 1, Off = 0
+        }
+
+        public event EventHandler ToggleOn;
+        public event EventHandler ToggleOff;
+
+        [Category("Appearance")]
+        public string TextOff { get; set; }
+        [Category("Appearance")]
+        public string TextOn { get; set; }
+        [Category("Data")] [SettingsBindable(true)]
+        public ToggleStates ToggleState { get; set; }
+
+        private TablessTabControl _view;
+        [Category("Data")]
+        public TablessTabControl View
+        {
+            get { return _view; }
+            set
+            {
+                if (value != null)
+                {
+                    if (_view != null)
+                        this._view.SelectedIndexChanged -= OnViewSelectedIndexChanged;
+                    this._view = value;
+                    this._view.SelectedIndexChanged += OnViewSelectedIndexChanged;
+                }
+            }
+        }
+
+        public override string Text
+        {
+            get
+            {
+                switch (ToggleState)
+                {
+                    case ToggleStates.Off:
+                        return TextOff;
+                    case ToggleStates.On:
+                        return TextOn;
+                    default:
+                        return "No state";
+                }
+            }
+        }
+
+        public ToggleButton()
+        {
+            this.TextOff = "Off";
+            this.TextOn = "On";
+            this.ToggleState = ToggleStates.Off;
+        }
+
+        public ToggleButton(string offText, string onText)
+        {
+            TextOn = offText;
+            TextOff = onText;
+        }
+
+        protected void OnViewSelectedIndexChanged(Object sender, EventArgs e)
+        {
+            ToggleState = (ToggleStates)_view.SelectedIndex;
+        }
+
+        protected override void OnClick(EventArgs e)
+        {
+            base.OnClick(e);
+            switch (ToggleState)
+            {
+                case ToggleStates.Off:
+                    ToggleState = ToggleStates.On;
+                    if (ToggleOn != null) ToggleOn(this, e);
+                    break;
+                case ToggleStates.On:
+                    ToggleState = ToggleStates.Off;
+                    if (ToggleOff != null) ToggleOff(this, e);
+                    break;
+            }
+            base.Invalidate();
+
+            if (_view != null)
+                _view.SelectedIndex = (int) ToggleState;
+        }
+    }
+
+    public class TablessTabControl : TabControl
+    {
+        private bool _allowTabKey = true;
+        public bool AllowTabKey { get { return _allowTabKey; } set { _allowTabKey = value; } }
+
+        private bool _allowArrowKeys = true;
+        public bool AllowArrowKeys { get { return _allowArrowKeys; } set { _allowArrowKeys = value; } }
+
+        protected override void WndProc(ref Message m)
+        {
+            // Hide tabs by trapping the TCM_ADJUSTRECT message
+            if (m.Msg == 0x1328 && !DesignMode) m.Result = (IntPtr)1;
+            else base.WndProc(ref m);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs ke)
+        {
+            // Block Ctrl+Tab and Ctrl+Shift+Tab hotkeys
+            if (ke.Control && ke.KeyCode == Keys.Tab && !_allowTabKey)
+                return;
+            else if ((ke.KeyCode == Keys.Left || ke.KeyCode == Keys.Right || ke.KeyCode == Keys.Up || ke.KeyCode == Keys.Down) && !_allowArrowKeys)
+                ke.SuppressKeyPress = true;
+            base.OnKeyDown(ke);
+        }
+    }
+}
